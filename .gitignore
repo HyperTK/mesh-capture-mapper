@@ -11,9 +11,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# 個人情報を含み得る実データ・出力は追跡しない（共有はGeoJSON運用ルールに従う）
-data/input/*.csv
-data/output/*.geojson
-# 実データ由来の出力（捕獲者名など個人情報を含む）。KML/GeoJSON とも除外。
-data/output/capture_records.*
-!data/input/sample_records.csv
+# data/input・data/output の中身は一切追跡しない（個人情報を含み得るため）。
+# data/reference（格子対応表など個人情報を含まない参照データ）は対象外。
+data/input/
+data/output/
