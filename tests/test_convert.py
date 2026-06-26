@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.convert import convert_csv, record_to_feature
+from src.convert import convert_csv, record_to_feature, validate_csv
 from src.grid import MeshGrid
 from src.wareki import wareki_to_iso
 
@@ -88,3 +88,30 @@ def test_duplicate_mesh_quadrant_same_point_kept(grid):
             and f["properties"]["quadrant"] == "右下"]
     assert len(c374) == 2
     assert c374[0]["geometry"]["coordinates"] == c374[1]["geometry"]["coordinates"]
+
+
+def test_validate_clean_real_data(grid):
+    # 修正済みの実データは点検で警告ゼロ。
+    real = ROOT / "data" / "input" / "capture_records.csv"
+    assert validate_csv(real, grid) == []
+
+
+def test_validate_catches_errors(grid, tmp_path):
+    csv_text = (
+        "serialNo,captureNo,species,mesh,quadrant,weightKg,fetusCount\n"
+        "1,S-1,イノシシ,Z-999,左下,30,0\n"          # 未登録メッシュ
+        "1,S-1,イノシシ,C-374,まんなか,9000,99\n"   # 通し重複+象限不正+体重範囲外+胎児異常+捕獲番号重複
+        "3,S-3,ツキノワ,C-374,左下,abc,0\n"          # 種別不正+体重非数値+欠番(2)
+    )
+    p = tmp_path / "broken.csv"
+    p.write_text(csv_text, encoding="utf-8")
+    warns = "\n".join(validate_csv(p, grid))
+    assert "未登録メッシュ" in warns
+    assert "不正な象限" in warns
+    assert "体重が範囲外" in warns
+    assert "胎児頭数が異常" in warns
+    assert "捕獲番号が重複" in warns
+    assert "未知の種別" in warns
+    assert "体重が数値でない" in warns
+    assert "通し番号が重複" in warns
+    assert "欠番" in warns

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+from collections import defaultdict
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -25,12 +27,56 @@ SPECIES_COLOR = {
 }
 DEFAULT_COLOR = "ff00ffff"   # 黄（種不明）
 
+# 同一座標（同一メッシュ＋象限）に重なるピンを小さな円状に散らす半径（度・緯度方向）。
+# 象限は1/4セル（緯度約0.0105°）なので、その内側に十分収まる小さめの値。
+# 経度方向は 1/cos(lat) で割って画面上で正円に見えるよう補正する。
+JITTER_RADIUS_DEG = 0.0018
+
+
+def _jittered(lon: float, lat: float, idx: int, count: int) -> tuple[float, float]:
+    """同一座標に count 個重なるうちの idx 番目を、中心まわりの小円上に配置する。
+
+    count==1 なら中心のまま。座標は象限中心からのずれであり、データの真値は
+    GeoJSON 側（象限中心）に保持される。表示分離のための KML 専用処理。
+    """
+    if count <= 1:
+        return lon, lat
+    angle = 2.0 * math.pi * idx / count
+    dlat = JITTER_RADIUS_DEG * math.sin(angle)
+    coslat = math.cos(math.radians(lat)) or 1.0
+    dlon = JITTER_RADIUS_DEG * math.cos(angle) / coslat
+    return lon + dlon, lat + dlat
+
+
+# properties キー -> Google Earth 表示用の日本語ラベル。表示順もこの定義順。
+JP_LABELS: list[tuple[str, str]] = [
+    ("serialNo", "通し番号"),
+    ("captureNo", "捕獲番号"),
+    ("species", "種別"),
+    ("hunterName", "捕獲者"),
+    ("team", "班名"),
+    ("captureDate", "捕獲年月日"),
+    ("method", "猟具"),
+    ("areaName", "捕獲地区名"),
+    ("mesh", "メッシュ番号"),
+    ("quadrant", "メッシュ内位置"),
+    ("weightKg", "体重(kg)"),
+    ("lengthCm", "体長(cm)"),
+    ("sex", "性別"),
+    ("antler", "角"),
+    ("fetusCount", "胎児頭数"),
+    ("estimatedAge", "推定年齢"),
+]
+
 
 def _desc(props: dict) -> str:
-    keys = ["serialNo", "captureNo", "species", "team", "captureDate",
-            "method", "areaName", "mesh", "quadrant", "weightKg", "lengthCm",
-            "sex", "antler"]
-    lines = [f"{k}: {props.get(k)}" for k in keys if props.get(k) is not None]
+    # 胎児頭数は 0 も意味があるため None 以外は表示する。
+    lines = []
+    for key, label in JP_LABELS:
+        val = props.get(key)
+        if val is None:
+            continue
+        lines.append(f"{label}: {val}")
     return escape("\n".join(lines))
 
 
@@ -46,11 +92,23 @@ def build_kml(fc: dict) -> str:
             f"</Style>"
         )
 
-    for feat in fc.get("features", []):
-        geom = feat.get("geometry") or {}
-        if geom.get("type") != "Point":
-            continue
+    # 同一座標（同一メッシュ＋象限）のピンは重なって見えないため、出現順に
+    # インデックスを振って小円状に散らす。まず座標ごとの件数を数える。
+    point_feats = [f for f in fc.get("features", [])
+                   if (f.get("geometry") or {}).get("type") == "Point"]
+    coord_total: dict[tuple[float, float], int] = defaultdict(int)
+    for f in point_feats:
+        c = tuple(f["geometry"]["coordinates"][:2])
+        coord_total[c] += 1
+    coord_seen: dict[tuple[float, float], int] = defaultdict(int)
+
+    for feat in point_feats:
+        geom = feat["geometry"]
         lon, lat = geom["coordinates"][:2]
+        key = (lon, lat)
+        idx = coord_seen[key]
+        coord_seen[key] += 1
+        lon, lat = _jittered(lon, lat, idx, coord_total[key])
         props = feat.get("properties", {})
         color = SPECIES_COLOR.get(props.get("species"), DEFAULT_COLOR)
         name = " / ".join(

@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from .convert import convert_csv, write_geojson
+from .convert import convert_csv, validate_csv, write_geojson
 from .grid import MeshGrid
 
 DEFAULT_GRID = Path(__file__).resolve().parents[1] / "data" / "reference" / "mesh_grid.csv"
@@ -27,9 +27,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--output", help="出力 GeoJSON（省略時は標準出力）")
     p.add_argument("--grid", default=str(DEFAULT_GRID), help="メッシュ対応表 CSV")
     p.add_argument("--strict", action="store_true", help="欠損・未解決でエラー停止")
+    p.add_argument("--validate", action="store_true",
+                   help="変換前にCSVを点検し、疑わしい行を一覧表示する")
     args = p.parse_args(argv)
 
     grid = MeshGrid.from_csv(args.grid)
+
+    if args.validate:
+        warns = validate_csv(args.input, grid)
+        if warns:
+            print(f"⚠ 点検で {len(warns)} 件の要確認:", file=sys.stderr)
+            for w in warns:
+                print(f"  - {w}", file=sys.stderr)
+        else:
+            print("✓ 点検: 問題は見つかりませんでした。", file=sys.stderr)
+
     fc, skipped = convert_csv(args.input, grid, strict=args.strict)
 
     if args.output:
