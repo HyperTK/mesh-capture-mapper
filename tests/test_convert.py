@@ -76,10 +76,28 @@ def test_missing_mesh_is_skipped(grid):
 
 
 def test_property_order(grid):
-    # 出力 properties は日本語キーで、定義順に並ぶ。
+    # 出力 properties は先頭が name（捕獲者名）、以降は日本語キーで定義順。
     fc, _ = convert_csv(SAMPLE, grid)
     keys = list(fc["features"][0]["properties"].keys())
-    assert keys[:4] == ["通し番号", "捕獲番号", "種別", "捕獲者"]
+    assert keys[:5] == ["name", "通し番号", "捕獲番号", "種別", "捕獲者"]
+
+
+def test_name_is_hunter_and_captureno(grid):
+    # name は「捕獲者名(捕獲番号)」形式。捕獲者が無ければ捕獲番号のみ。
+    row = {
+        "serialNo": "1", "captureNo": "S-1", "species": "イノシシ",
+        "hunterName": "滝野駿", "team": "御所第1班", "captureDate": "令和8年4月1日",
+        "method": "くくり罠", "areaName": "西安庭", "mesh": "C-374",
+        "quadrant": "右下", "weightKg": "30", "lengthCm": "95", "sex": "メス", "antler": "なし",
+    }
+    feat = record_to_feature(row, grid)
+    assert feat["properties"]["name"] == "滝野駿(S-1)"
+
+    # 捕獲者が空（sample の全行）は捕獲番号のみ。
+    fc, _ = convert_csv(SAMPLE, grid)
+    f0 = fc["features"][0]["properties"]
+    assert f0["捕獲者"] is None
+    assert f0["name"] == f0["捕獲番号"]
 
 
 def test_duplicate_mesh_quadrant_same_point_kept(grid):

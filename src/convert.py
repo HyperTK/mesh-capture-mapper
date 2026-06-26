@@ -94,6 +94,22 @@ def _to_number(value: str | None, as_int: bool = False) -> float | int | None:
     return int(num) if num.is_integer() else num
 
 
+def _build_name(raw: dict[str, Any]) -> str | None:
+    """地図ラベル用の name を「捕獲者名(捕獲番号)」で組み立てる。
+
+    例: 滝野駿(S-1)。捕獲者が無ければ捕獲番号のみ、両方無ければ None。
+    """
+    hunter = raw.get("hunterName")
+    cap = raw.get("captureNo")
+    if hunter and cap:
+        return f"{hunter}({cap})"
+    if hunter:
+        return hunter
+    if cap:
+        return cap
+    return None
+
+
 def record_to_feature(row: dict[str, str], grid: MeshGrid,
                       strict: bool = False) -> dict[str, Any] | None:
     """CSV 1 行を GeoJSON Feature に変換。座標が引けない場合の扱いは strict で制御。
@@ -130,7 +146,10 @@ def record_to_feature(row: dict[str, str], grid: MeshGrid,
         return None
 
     # properties は日本語キーで、定義順に並べて出力する。
-    props: dict[str, Any] = {label: raw.get(key) for key, label in PROP_LABELS}
+    # 先頭の name は地図ツールがラベルとして認識する慣例キー。
+    # 「捕獲者名(捕獲番号)」形式（例: 滝野駿(S-1)）。欠ける項目は省く。
+    props: dict[str, Any] = {"name": _build_name(raw)}
+    props.update({label: raw.get(key) for key, label in PROP_LABELS})
     # species（種別）の正規化チェック（不正値はそのまま残しつつ警告対象に）。
     if raw.get("species") not in VALID_SPECIES:
         props["_種別警告"] = True

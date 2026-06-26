@@ -56,9 +56,10 @@ NAME_KEYS = ("捕獲番号", "メッシュ番号", "メッシュ内位置")
 
 def _desc(props: dict) -> str:
     # properties をそのまま日本語キーで表示する。内部フラグ（_で始まる）は除く。
+    # name は地図ツール用の慣例キー（捕獲者と同値）なので説明文では重複を避け除外。
     # 胎児頭数は 0 も意味があるため None 以外は表示する。
     lines = [f"{k}: {v}" for k, v in props.items()
-             if not k.startswith("_") and v is not None]
+             if k != "name" and not k.startswith("_") and v is not None]
     return escape("\n".join(lines))
 
 
