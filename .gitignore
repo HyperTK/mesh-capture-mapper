@@ -1,0 +1,17 @@
+/有害駆除資料
+.DS_Store
+
+# 検証時のスクリーンショット（一時資料）
+スクリーンショット*.png
+*.screenshot.png
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# 個人情報を含み得る実データ・出力は追跡しない（共有はGeoJSON運用ルールに従う）
+data/input/*.csv
+data/output/*.geojson
+!data/input/sample_records.csv
