@@ -126,7 +126,10 @@ python -m src.ocr_assist 捕獲記録.pdf -o data/input/ocr_draft.txt
 ## 出力 GeoJSON
 
 - RFC 7946 FeatureCollection。`geometry: Point`、`coordinates = [経度, 緯度]`。
-- **1 Feature = 1 捕獲記録**。`properties` に元データを保持（`mesh`/`quadrant` 必須）。
+  規格キー（`type`/`geometry`/`coordinates`）は英語のまま。
+- **1 Feature = 1 捕獲記録**。`properties` のキーは**日本語**（`捕獲者`/`体重kg`/
+  `メッシュ番号`/`メッシュ内位置` など）で元データを保持する。`メッシュ番号`・
+  `メッシュ内位置` は座標の根拠として必須。
 - 同一（mesh＋象限）の重複は同一座標になるが、GeoJSON では**無理に散らさない**
   （座標は象限中心＝データの真値）。各記録を残し、表示側でクラスタ表示する前提。
 - 目視検証用の KML（`geojson_to_kml`）では、重なるピンを象限内で小円状に散らして

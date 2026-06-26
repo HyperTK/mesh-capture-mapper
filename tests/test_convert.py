@@ -46,10 +46,11 @@ def test_feature_matches_spec_shape(grid):
     # [経度, 緯度] の順で bbox 内
     assert 140.60895931 <= lon <= 141.06817802
     assert 39.28291197 <= lat <= 39.94402642
+    # 出力 properties は日本語キー。
     p = feat["properties"]
-    assert p["captureDate"] == "2026-04-21"
-    assert p["weightKg"] == 50 and isinstance(p["weightKg"], int)
-    assert p["mesh"] == "C-374" and p["quadrant"] == "右下"
+    assert p["捕獲年月日"] == "2026-04-21"
+    assert p["体重kg"] == 50 and isinstance(p["体重kg"], int)
+    assert p["メッシュ番号"] == "C-374" and p["メッシュ内位置"] == "右下"
 
 
 def test_empty_fields_become_null(grid):
@@ -61,9 +62,9 @@ def test_empty_fields_become_null(grid):
     }
     feat = record_to_feature(row, grid)
     p = feat["properties"]
-    assert p["weightKg"] is None
-    assert p["lengthCm"] is None
-    assert p["antler"] is None  # 空文字でなく null
+    assert p["体重kg"] is None
+    assert p["体長cm"] is None
+    assert p["角"] is None  # 空文字でなく null
 
 
 def test_missing_mesh_is_skipped(grid):
@@ -75,17 +76,18 @@ def test_missing_mesh_is_skipped(grid):
 
 
 def test_property_order(grid):
+    # 出力 properties は日本語キーで、定義順に並ぶ。
     fc, _ = convert_csv(SAMPLE, grid)
     keys = list(fc["features"][0]["properties"].keys())
-    assert keys[:4] == ["serialNo", "captureNo", "species", "hunterName"]
+    assert keys[:4] == ["通し番号", "捕獲番号", "種別", "捕獲者"]
 
 
 def test_duplicate_mesh_quadrant_same_point_kept(grid):
     # 同一(mesh+quadrant)の2記録は同一座標で、両方とも残る（散らさない）。
     fc, _ = convert_csv(SAMPLE, grid)
     c374 = [f for f in fc["features"]
-            if f["properties"]["mesh"] == "C-374"
-            and f["properties"]["quadrant"] == "右下"]
+            if f["properties"]["メッシュ番号"] == "C-374"
+            and f["properties"]["メッシュ内位置"] == "右下"]
     assert len(c374) == 2
     assert c374[0]["geometry"]["coordinates"] == c374[1]["geometry"]["coordinates"]
 

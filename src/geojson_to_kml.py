@@ -48,35 +48,17 @@ def _jittered(lon: float, lat: float, idx: int, count: int) -> tuple[float, floa
     return lon + dlon, lat + dlat
 
 
-# properties キー -> Google Earth 表示用の日本語ラベル。表示順もこの定義順。
-JP_LABELS: list[tuple[str, str]] = [
-    ("serialNo", "通し番号"),
-    ("captureNo", "捕獲番号"),
-    ("species", "種別"),
-    ("hunterName", "捕獲者"),
-    ("team", "班名"),
-    ("captureDate", "捕獲年月日"),
-    ("method", "猟具"),
-    ("areaName", "捕獲地区名"),
-    ("mesh", "メッシュ番号"),
-    ("quadrant", "メッシュ内位置"),
-    ("weightKg", "体重(kg)"),
-    ("lengthCm", "体長(cm)"),
-    ("sex", "性別"),
-    ("antler", "角"),
-    ("fetusCount", "胎児頭数"),
-    ("estimatedAge", "推定年齢"),
-]
+# GeoJSON properties は convert 側で既に日本語キー・定義順になっている。
+# 種別・メッシュ番号・メッシュ内位置はピン名/色分けに使う日本語キー。
+SPECIES_KEY = "種別"
+NAME_KEYS = ("捕獲番号", "メッシュ番号", "メッシュ内位置")
 
 
 def _desc(props: dict) -> str:
+    # properties をそのまま日本語キーで表示する。内部フラグ（_で始まる）は除く。
     # 胎児頭数は 0 も意味があるため None 以外は表示する。
-    lines = []
-    for key, label in JP_LABELS:
-        val = props.get(key)
-        if val is None:
-            continue
-        lines.append(f"{label}: {val}")
+    lines = [f"{k}: {v}" for k, v in props.items()
+             if not k.startswith("_") and v is not None]
     return escape("\n".join(lines))
 
 
@@ -110,9 +92,9 @@ def build_kml(fc: dict) -> str:
         coord_seen[key] += 1
         lon, lat = _jittered(lon, lat, idx, coord_total[key])
         props = feat.get("properties", {})
-        color = SPECIES_COLOR.get(props.get("species"), DEFAULT_COLOR)
+        color = SPECIES_COLOR.get(props.get(SPECIES_KEY), DEFAULT_COLOR)
         name = " / ".join(
-            str(props.get(k)) for k in ("captureNo", "mesh", "quadrant")
+            str(props.get(k)) for k in NAME_KEYS
             if props.get(k) is not None
         ) or "(no name)"
         parts.append(

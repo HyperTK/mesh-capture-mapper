@@ -43,11 +43,26 @@ WEIGHT_KG_RANGE = (1, 200)
 LENGTH_CM_RANGE = (10, 300)
 FETUS_COUNT_MAX = 12
 
-# properties の出力順（仕様 Feature 例に準拠）。
-PROP_ORDER = [
-    "serialNo", "captureNo", "species", "hunterName", "team", "captureDate",
-    "method", "areaName", "mesh", "quadrant", "weightKg", "lengthCm", "sex", "antler",
-    "fetusCount", "estimatedAge",
+# 内部キー（英語）-> GeoJSON properties の出力キー（日本語）。
+# 内部処理は英語キーのまま行い、出力時にこの対応で日本語キーへ変換する。
+# 出力順もこの定義順。GeoJSON 規格のキー（type/geometry/coordinates）は英語のまま。
+PROP_LABELS: list[tuple[str, str]] = [
+    ("serialNo", "通し番号"),
+    ("captureNo", "捕獲番号"),
+    ("species", "種別"),
+    ("hunterName", "捕獲者"),
+    ("team", "班名"),
+    ("captureDate", "捕獲年月日"),
+    ("method", "猟具"),
+    ("areaName", "捕獲地区名"),
+    ("mesh", "メッシュ番号"),
+    ("quadrant", "メッシュ内位置"),
+    ("weightKg", "体重kg"),
+    ("lengthCm", "体長cm"),
+    ("sex", "性別"),
+    ("antler", "角"),
+    ("fetusCount", "胎児頭数"),
+    ("estimatedAge", "推定年齢"),
 ]
 
 
@@ -98,27 +113,27 @@ def record_to_feature(row: dict[str, str], grid: MeshGrid,
     if raw.get("fetusCount") is None:
         raw["fetusCount"] = 0
 
-    # properties は仕様の Feature 例に沿った順序で並べる。
-    props: dict[str, Any] = {k: raw.get(k) for k in PROP_ORDER}
-
-    # species の正規化チェック（不正値はそのまま残しつつ警告対象に）
-    if props["species"] not in VALID_SPECIES:
-        props["_speciesWarning"] = True
-
-    mesh = props["mesh"]
-    quadrant = props["quadrant"]
+    # 座標解決は内部キー（英語）で行う。
+    mesh = raw.get("mesh")
+    quadrant = raw.get("quadrant")
     if not mesh or not quadrant:
         if strict:
-            raise ValueError(f"mesh/quadrant 欠損: serialNo={props.get('serialNo')}")
+            raise ValueError(f"mesh/quadrant 欠損: serialNo={raw.get('serialNo')}")
         return None
     try:
         lon, lat = grid.point(mesh, quadrant)
-    except KeyError as e:
+    except KeyError:
         if strict:
             raise
         # 未解決メッシュ/象限は geometry null で残す案もあるが、
         # 仕様は座標必須なのでスキップし呼び出し側で件数報告する。
         return None
+
+    # properties は日本語キーで、定義順に並べて出力する。
+    props: dict[str, Any] = {label: raw.get(key) for key, label in PROP_LABELS}
+    # species（種別）の正規化チェック（不正値はそのまま残しつつ警告対象に）。
+    if raw.get("species") not in VALID_SPECIES:
+        props["_種別警告"] = True
 
     return {
         "type": "Feature",
